@@ -1,6 +1,7 @@
 package se.sanitarium.osps.splitter;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -11,14 +12,24 @@ public class Splitter {
   private BigDecimal total;
   private Integer split;
   private Currency currency = new Currency();
-  private Extra extra = Extra.NONE;
+  private ArrayList<Extra> extra = new ArrayList<>();
 
   public Splitter(String s) {
     this.input = s;
     parse();
   }
 
-  public enum Extra {NONE, TAX, SERVICE_FEE_AND_TAX}
+  private enum Extra {
+    NONE("1.0"),
+    TAX("1.07"),
+    SERVICE_FEE_AND_TAX("1.10");
+
+    public final BigDecimal rate;
+
+    Extra(String rate) {
+      this.rate = new BigDecimal(rate);
+    }
+  }
 
   public BigDecimal split() {
     return getTotal()
@@ -26,15 +37,12 @@ public class Splitter {
   }
 
   public BigDecimal getTotal() {
-    if (extra == Extra.TAX) {
-      return total.multiply(currency.getTaxRate());
-    } else if (extra == Extra.SERVICE_FEE_AND_TAX) {
-      return total
-          .multiply(currency.getServiceFee())
-          .multiply(currency.getTaxRate());
+    BigDecimal totalWithFees = total;
+    for (Extra fee : extra) {
+      totalWithFees = totalWithFees.multiply(fee.rate);
     }
 
-    return total;
+    return totalWithFees;
   }
 
   private void parse() {
@@ -72,12 +80,16 @@ public class Splitter {
   }
 
   private void setExtra(Integer extra) {
-    if (extra == 1) {
-      this.extra = Extra.TAX;
-    } else if (extra == 2) {
-      this.extra = Extra.SERVICE_FEE_AND_TAX;
-    } else {
-      this.extra = Extra.NONE;
+    switch (extra) {
+      case 2:
+        this.extra.add(Extra.SERVICE_FEE_AND_TAX);
+        // Fall through
+      case 1:
+        this.extra.add(Extra.TAX);
+        break;
+      default:
+        this.extra.add(Extra.NONE);
+        break;
     }
   }
 }
