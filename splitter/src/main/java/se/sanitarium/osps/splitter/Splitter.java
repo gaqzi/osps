@@ -10,8 +10,8 @@ public class Splitter {
     private String input;
     private BigDecimal total;
     private Integer split;
-    private String currency = "N/A";
-    private Integer extra = 0;
+    private Currency currency = new Currency();
+    private Extra extra = Extra.NONE;
 
     public Splitter(String s) {
         this.input = s;
@@ -19,7 +19,20 @@ public class Splitter {
     }
 
     public BigDecimal split() {
-        return getTotal().divide(new BigDecimal(getSplit()), BigDecimal.ROUND_CEILING);
+        return getTotal()
+                .divide(new BigDecimal(split), BigDecimal.ROUND_CEILING);
+    }
+
+    public BigDecimal getTotal() {
+        if (extra == Extra.TAX) {
+            return total.multiply(currency.getTaxRate());
+        } else if (extra == Extra.SERVICE_FEE_AND_TAX) {
+            return total
+                    .multiply(currency.getServiceFee())
+                    .multiply(currency.getTaxRate());
+        }
+
+        return total;
     }
 
     private void parse() {
@@ -32,53 +45,37 @@ public class Splitter {
         );
 
         Matcher m = regex.matcher(input);
-        if(m.matches()) {
-            this.total = new BigDecimal(m.group("total"));
-            setSplit(parseInt(m.group("split")));
-
-            if(m.group("currency") != null) {
-                setCurrency(m.group("currency"));
-            }
-
-            if(m.group("extra") != null) {
-                setExtra(m.group("extra").length());
-            }
-        }
-    }
-
-    public BigDecimal getTotal() {
-        if(getExtra() == 1) {
-            return total.multiply(new BigDecimal("1.07"));
-        } else if(getExtra() == 2) {
-            return total
-                    .multiply(new BigDecimal("1.10"))
-                    .multiply(new BigDecimal("1.07"));
+        if (!m.matches()) {
+            return;
         }
 
-        return total;
-    }
+        this.total = new BigDecimal(m.group("total"));
+        this.split = (parseInt(m.group("split")));
 
-    public Integer getSplit() {
-        return split;
-    }
+        if (m.group("currency") != null) {
+            setCurrency(m.group("currency"));
+        }
 
-    private void setSplit(Integer split) {
-        this.split = split;
-    }
-
-    public String getCurrency() {
-        return currency;
+        if (m.group("extra") != null) {
+            setExtra(m.group("extra").length());
+        }
     }
 
     private void setCurrency(String currency) {
-        this.currency = currency;
-    }
-
-    public Integer getExtra() {
-        return extra;
+        if (currency.equals("SGD")) {
+            this.currency = new Currency("SGD", new BigDecimal("1.07"), new BigDecimal("1.10"));
+        } else {
+            this.currency = new Currency();
+        }
     }
 
     private void setExtra(Integer extra) {
-        this.extra = extra;
+        if (extra == 1) {
+            this.extra = Extra.TAX;
+        } else if (extra == 2) {
+            this.extra = Extra.SERVICE_FEE_AND_TAX;
+        } else {
+            this.extra = Extra.NONE;
+        }
     }
 }
