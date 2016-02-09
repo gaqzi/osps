@@ -11,7 +11,6 @@ public class Splitter {
   private final String input;
   private BigDecimal total;
   private Integer split;
-  private Currency currency = new Currency();
   private ArrayList<Extra> extra = new ArrayList<>();
 
   public Splitter(String s) {
@@ -48,7 +47,7 @@ public class Splitter {
   private void parse() {
     Pattern regex = Pattern.compile(
         "(?<total>\\d+(\\.\\d+)?)" +
-            "(?<currency>\\w{2,3})?" +
+            "(?<currency>\\w{2,3})?" + // Gobble up if there, but ignore it.
             "(?<extra>\\+{0,2})?" +
             "/(?<split>\\d{1,2})",
         Pattern.COMMENTS
@@ -62,20 +61,8 @@ public class Splitter {
     this.total = new BigDecimal(m.group("total"));
     this.split = (parseInt(m.group("split")));
 
-    if (m.group("currency") != null) {
-      setCurrency(m.group("currency"));
-    }
-
     if (m.group("extra") != null) {
       setExtra(m.group("extra").length());
-    }
-  }
-
-  private void setCurrency(String currency) {
-    if (currency.equals("SGD")) {
-      this.currency = new Currency("SGD", new BigDecimal("1.07"), new BigDecimal("1.10"));
-    } else {
-      this.currency = new Currency();
     }
   }
 
