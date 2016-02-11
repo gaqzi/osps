@@ -13,21 +13,29 @@ public class SplitterTest {
 
   @Test
   public void testSplit() {
-    assertThat(new Splitter("100SGD/5").split(),
+    assertThat(Splitter.parse("100SGD/5").getPerPerson(),
         is(closeTo(new BigDecimal("20.0"), new BigDecimal("0.1"))));
 
-    assertThat(new Splitter("100SGD+/5").split(),
+    assertThat(Splitter.parse("100SGD+/5").getPerPerson(),
         is(closeTo(new BigDecimal("21.4"), new BigDecimal("0.1"))));
 
-    assertThat(new Splitter("100SGD++/5").split(),
+    assertThat(Splitter.parse("100SGD++/5").getPerPerson(),
         is(closeTo(new BigDecimal("23.54"), new BigDecimal("0.1"))));
   }
 
   @Test
   public void testCalculatesTotal() {
     assertThat(
-        new BigDecimal("100.0"),
-        is(closeTo(new Splitter("100SGD/4").getTotal(), new BigDecimal("0.1")))
+        Splitter.parse("100SGD/4").getTotalWithFees(),
+        is(closeTo(new BigDecimal("100.0"), new BigDecimal("0.1")))
+    );
+  }
+
+  @Test
+  public void testConstructorForRest() {
+    assertThat(
+        new Splitter(new BigDecimal("100"), 4, 0).getPerPerson(),
+        is(closeTo(new BigDecimal("25"), new BigDecimal("0.1")))
     );
   }
 }

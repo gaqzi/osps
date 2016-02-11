@@ -1,5 +1,10 @@
 package se.sanitarium.osps.splitter;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+import org.springframework.hateoas.ResourceSupport;
+
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.regex.Matcher;
@@ -7,15 +12,20 @@ import java.util.regex.Pattern;
 
 import static java.lang.Integer.parseInt;
 
-public class Splitter {
-  private final String input;
+public class Splitter extends ResourceSupport {
   private BigDecimal total;
-  private Integer split;
+  private BigDecimal totalWithFees;
+  private BigDecimal perPerson;
   private ArrayList<Extra> extra = new ArrayList<>();
 
-  public Splitter(String s) {
-    this.input = s;
-    parse();
+  @JsonCreator
+  public Splitter(BigDecimal total, Integer split, Integer fee) {
+    this.total = total;
+    this.setExtra(fee);
+
+    setTotalWithFees(total);
+    this.perPerson = getTotalWithFees()
+        .divide(new BigDecimal(split), BigDecimal.ROUND_CEILING);
   }
 
   private enum Extra {
@@ -30,21 +40,7 @@ public class Splitter {
     }
   }
 
-  public BigDecimal split() {
-    return getTotal()
-        .divide(new BigDecimal(split), BigDecimal.ROUND_CEILING);
-  }
-
-  public BigDecimal getTotal() {
-    BigDecimal totalWithFees = total;
-    for (Extra fee : extra) {
-      totalWithFees = totalWithFees.multiply(fee.rate);
-    }
-
-    return totalWithFees;
-  }
-
-  private void parse() {
+  public static Splitter parse(String input) {
     Pattern regex = Pattern.compile(
         "(?<total>\\d+(\\.\\d+)?)" +
             "(?<currency>\\w{2,3})?" + // Gobble up if there, but ignore it.
@@ -54,18 +50,35 @@ public class Splitter {
     );
 
     Matcher m = regex.matcher(input);
-    if (!m.matches()) {
-      return;
+    if (!m.matches()) { // TODO: Throw an exception here.
+//      throw new IllegalBillString(); // "String '"+ input +"' did not parse properly."
+      return new Splitter(new BigDecimal("100"), 4, 0);
     }
 
-    this.total = new BigDecimal(m.group("total"));
-    this.split = (parseInt(m.group("split")));
-
+    int extras = 0;
     if (m.group("extra") != null) {
-      setExtra(m.group("extra").length());
+      extras = m.group("extra").length();
+    }
+
+    return new Splitter(
+        new BigDecimal(m.group("total")),
+        parseInt(m.group("split")),
+        extras
+    );
+  }
+
+  private void setTotalWithFees(BigDecimal total) {
+    this.totalWithFees = total;
+    for (Extra fee : extra) {
+      this.totalWithFees = totalWithFees.multiply(fee.rate);
     }
   }
 
+  /**
+   * All the fees that this bill has. Supports percentage based fees only.
+   *
+   * @param extra 1 = + (just tax), 2 = ++ (service fee and tax)
+   */
   private void setExtra(Integer extra) {
     switch (extra) {
       case 2:
@@ -78,5 +91,28 @@ public class Splitter {
         this.extra.add(Extra.NONE);
         break;
     }
+  }
+
+  @JsonProperty("total")
+  public BigDecimal getTotal() {
+    return total;
+  }
+
+  @JsonProperty("feeAmount")
+  public BigDecimal getFees() {
+    return getTotalWithFees().subtract(getTotal());
+  }
+
+  @JsonProperty("totalWithFees")
+  public BigDecimal getTotalWithFees() {
+    return totalWithFees;
+  }
+
+  @JsonProperty("perPerson")
+  public BigDecimal getPerPerson() {
+    return perPerson;
+  }
+
+  public class IllegalBillString extends Exception {
   }
 }
